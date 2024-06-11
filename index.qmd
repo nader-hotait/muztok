@@ -1,0 +1,619 @@
+---
+title: "Islamic Content Creators on TikTok"
+author: "Nader Hotait"
+format:  
+  html: 
+    fig-format: svg
+    dpi: 700
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r packages}
+pacman::p_load(tidyverse, readxl, igraph, ggraph, RColorBrewer, corrplot,
+               gridExtra, lubridate, ggridges)
+options(knitr.kable.NA = "")
+```
+
+```{r data}
+df <- read_excel("muztok_df.xlsx")
+df$emancipation  <- gsub("z","c", df$emancipation)
+```
+
+```{r pseudo}
+df <- df %>%
+  mutate(Pseudonym = case_when(
+    user.y == "abumikail1" ~ "PT1",
+    user.y == "amal_tvv" ~ "PT2",
+    user.y == "bjoernslife" ~ "PT3",
+    user.y == "circassian.eagle" ~ "PT4",
+    user.y == "dawahgang" ~ "PT5",
+    user.y == "deen_akademie" ~ "PT6",
+    user.y == "deen_ul_islam1" ~ "PT7",
+    user.y == "enes.vaseelah" ~ "PT8",
+    user.y == "ezwr1" ~ "PT9",
+    user.y == "fiete_boi" ~ "PT10",
+    user.y == "generation_islam" ~ "PT11",
+    user.y == "generation_islamgi" ~ "PT12",
+    user.y == "gglaros" ~ "PT13",
+    user.y == "gil.lua99" ~ "PT14",
+    user.y == "hamzaadrianhamza" ~ "PT15",
+    user.y == "hidayaelisa" ~ "PT16",
+    user.y == "iman.vogue" ~ "PT17",
+    user.y == "imauftragdesislam" ~ "PT18",
+    user.y == "imjuliajordan" ~ "PT19",
+    user.y == "islam_moe" ~ "PT20",
+    user.y == "islamcontent5778ii" ~ "PT21",
+    user.y == "islamcontent778" ~ "PT22",
+    user.y == "islamic.wort" ~ "PT23",
+    user.y == "islammzitate" ~ "PT24",
+    user.y == "islamwunder" ~ "PT25",
+    user.y == "isso_bayan" ~ "PT26",
+    user.y == "logical114" ~ "PT27",
+    user.y == "loransyusuf" ~ "PT28",
+    user.y == "loveallah.de" ~ "PT29",
+    user.y == "machtsklick_support" ~ "PT30",
+    user.y == "mazooffiziell1" ~ "PT31",
+    user.y == "mert.islam.27" ~ "PT32",
+    user.y == "mira_eliane" ~ "PT33",
+    user.y == "moe786hh" ~ "PT34",
+    user.y == "mucahit_akif_uzun" ~ "PT35",
+    user.y == "musliminteraktiv" ~ "PT36",
+    user.y == "nalhi.23" ~ "PT37",
+    user.y == "redlionx" ~ "PT38",
+    user.y == "safi_muslimcouple" ~ "PT39",
+    user.y == "sakinaannur" ~ "PT40",
+    user.y == "sarikliyunus" ~ "PT41",
+    user.y == "teamsad.1" ~ "PT42",
+    user.y == "youngmuslimofficial" ~ "PT43",
+    TRUE ~ NA_character_
+  ))
+```
+
+
+```{r transforming data}
+cols_indicators <- c("activism", "closure", "dehuman", "delegitim", "dichotom", "emancipation",
+             "interfaith", "monism", "revisionism", "sectarianism", "victim", 
+             "violence", "vioreg")
+
+cols_topics <- c("advoc", "afterlife", "business", "comedy", "conversion", "crime", 
+             "discrimination", "education", "gender", "history", "ijma",
+             "kinship", "lawful", "lifestyle", "media", "middle_east", "moral",
+             "motivation", "ramadan", "rap", "rolemodels", "scarf", "shirk",
+             "western_hypo")
+
+df_long_indicators <- df %>%
+  pivot_longer(
+    cols = cols_indicators,
+    names_to = "indicator",
+    values_to = "indicator_value"
+  )
+
+df_long_indicators <- df_long_indicators[!grepl("_na", df_long_indicators$indicator_value),]
+
+df_long_topics <- df %>%
+  pivot_longer(
+    cols = cols_topics,
+    names_to = "topic",
+    values_to = "topic_value"
+  )
+
+df_long_topics <- df_long_topics[!grepl("_na", df_long_topics$topic_value),]
+
+
+df_final_long <- df_long_indicators %>%
+  select(id_short, indicator, indicator_value) %>%
+  full_join(df_long_topics %>%
+              select(id_short, topic, topic_value),
+            by = "id_short")
+```
+
+## Topic and Indicator Frequency
+
+::: {.panel-tabset}
+### Topics
+```{r topics_table}
+topics_df <-  df[,cols_topics]
+for(i in 1:24){
+  topics_df[i] <- ifelse(topics_df[i]==cols_topics[i],1,0)
+}
+
+topics_long <-  topics_df %>% 
+  pivot_longer(everything(), names_to = "Topic")
+
+topics_sum <- topics_long %>%
+  group_by(Topic) %>%
+  summarise(Count = sum(value))
+
+topics_sum <- topics_sum %>%
+  mutate(Content = case_when(
+    Topic == "advoc" ~ "Religious Advocacy, Reminders, Teaching",
+    Topic == "afterlife" ~ "Death, Heaven, Hell",
+    Topic == "business" ~ "Finance, How to make Money",
+    Topic == "comedy" ~ "Funny and Humoristic Videos",
+    Topic == "conversion" ~ "Convert Stories, Conversion to Islam",
+    Topic == "crime" ~ "Crime, Criminality, Delinquency",
+    Topic == "discrimination" ~ "Discrimination, Racism, Islamophobia",
+    Topic == "education" ~ "Education (Personal, School, etc.)",
+    Topic == "gender" ~ "Gender Relations",
+    Topic == "history" ~ "Stories from History, History as a topic",
+    Topic == "ijma" ~ "Islamic Jurisprudence given from consensus",
+    Topic == "kinship" ~ "Partnership, Parent-Children relations",
+    Topic == "lawful" ~ "What is allowed/not allowed in Islam (haram/halal)",
+    Topic == "lifestyle" ~ "Clothing, Food, Travel, Music, Dance",
+    Topic == "media" ~ "Media Entities, Reports, Outlets as a Topic",
+    Topic == "middle_east" ~ "Israel-Palestine Conflict",
+    Topic == "moral" ~ "Moral Constitution/Morality of Society/People",
+    Topic == "motivation" ~ "Empowering People to strive for better",
+    Topic == "ramadan" ~ "Ramadan and Fasting",
+    Topic == "rap" ~ "Rap Music and Personalities",
+    Topic == "rolemodels" ~ "Islamic and Popcultural Rolemodels",
+    Topic == "scarf" ~ "Hijab, Headscarf, Veiling",
+    Topic == "shirk" ~ "Monotheism and Polytheism",
+    Topic == "western_hypo" ~ "Hypocrisy of the West/Western countries<br>towards Muslims compared to others"
+  ))
+
+topics_sum <- topics_sum %>% arrange(-Count)
+
+knitr::kable(topics_sum)
+```
+
+### Take-Aways
+
++ 
+
+:::
+
+::: {.panel-tabset}
+
+### Indicators
+
+```{r indicator_table}
+rad_df <- df[,cols_indicators]
+for(i in 1:13){
+  rad_df[,paste0("anti_",cols_indicators[i])] <- ifelse(rad_df[,cols_indicators[i]] == paste0("anti_",cols_indicators[i]),1,0)
+  rad_df[,cols_indicators[i]] <- ifelse(rad_df[,cols_indicators[i]]==cols_indicators[i],1,0)
+}
+
+rad_long <- rad_df %>% 
+  pivot_longer(everything(), names_to = "Codes")
+
+rad_sum <- rad_long %>%
+  group_by(Codes) %>%
+  summarise(Count = sum(value))
+
+rad_sum$Indicator <- rad_sum$Codes
+rad_sum$Indicator <- gsub("anti_", "", rad_sum$Indicator)
+
+
+rad_table <- rad_sum %>%
+  left_join(rad_sum %>%
+  group_by(Indicator) %>%
+  summarise(Total = sum(Count)), by = "Indicator")
+
+rad_table <- rad_table %>%
+  mutate(order = ifelse(grepl("anti", Codes)==T,2,1))
+
+rad_table <- rad_table %>%
+  arrange(-Total,Indicator,order)
+
+rad_table <- rad_table %>%
+  mutate(Content = case_when(
+Codes == "activism" ~ "Legal political activism (Protest, Boycott, Art)",
+Codes == "anti_activism" ~ "Against activism:",
+Codes == "closure" ~ "Discrimination and exclusion of people from certain spaces and social life",
+Codes == "anti_closure" ~ "Against closure, granting access to spaces, favoring friendships/ties",
+Codes == "dehuman" ~ "Denying humanity of others, harsh insults",
+Codes == "anti_dehuman" ~ "Against dehumanization, defending people against it",
+Codes == "delegitim" ~ "Belief in the illegitimacy/obsolescence of (German) democracy, political institutions, and the fundamental socio-political system",
+Codes == "anti_delegitim" ~ "Belief in their legitimacy",
+Codes == "dichotom" ~ "Dividing the world, society, and groups into friend and foe",
+Codes == "anti_dichotom" ~ "Seeing the world, society, and groups beyond friend and foe distinctions",
+Codes == "emancipation" ~ "Emancipation of people/groups (typically women and children), rights to education, etc.",
+Codes == "anti_emancipation" ~ "Dependence of people/groups, with limited or no access to rights and education",
+Codes == "interfaith" ~ "Embracing interfaith cohesion/exchange/collaboration/respect",
+Codes == "anti_interfaith" ~ "Rejection of interfaith cohesion/exchange/collaboration/respect",
+Codes == "monism" ~ "Belief in a single, exclusively true interpretation and practice of Islam, while rejecting differing opinions and ambiguities",
+Codes == "anti_monism" ~ "Embracing religious pluralism, tolerance of ambiguity, gray scales, and acceptance of diverse interpretations and practices within Islam",
+Codes == "revisionism" ~ "Reestablishment of the Islamic Caliphate or other past dynasties. Unification of Muslim peoples under one rule/Caliphate",
+Codes == "anti_revisionism" ~ "Opposition to restoring past Islamic dynasties, advocating for separate, independent governance among Muslim communities",
+Codes == "sectarianism" ~ "Denigration of other religious currents and exclusion of denominations from Islam that self-identify as such/Takfirism",
+Codes == "anti_sectarianism" ~ "Promotion of religious inclusivity and acceptance of diverse Islamic denominations",
+Codes == "victim" ~ "Victimization of the in-group, Muslims/Muslim nations. Not: Discrimination of other groups (see topic: discrimination)",
+Codes == "anti_victim" ~ "Recognition of Muslim agency, portrayal as aggressor",
+Codes == "violence" ~ "Use of physical violence to achieve political/religious goals. Jihadist rhetoric",
+Codes == "anti_violence" ~ "Pursuit of political/religious goals through non-violent means, emphasizing peaceful discourse",
+Codes == "vioreg" ~ "Authoritarian theology of a vengeful, stern God/religion and no error tolerance",
+Codes == "anti_vioreg" ~ "Belief in a merciful, understanding God with tolerance for human imperfection"))
+
+rad_table <- select(rad_table, Indicator, Total, Codes, Count, Content)
+rad_table$Codes <- ifelse(grepl("anti",rad_table$Codes)==T,"anti_*","*")
+
+rad_table$Indicator[c(FALSE, TRUE)] <- NA
+rad_table$Total[c(FALSE, TRUE)] <- NA
+
+knitr::kable(rad_table)
+```
+
+### Take-Aways
+
+Test
+
+:::
+
+## Co-Occurances: Victim
+
+::: {.panel-tabset}
+
+### Graph
+```{r victim bipartit}
+#| fig-width: 13.5
+#| 
+ids_with_victim <- df_final_long %>%
+  filter(indicator_value == "victim") %>%
+  distinct(id_short)
+
+victim_long <- df_final_long %>%
+  filter(id_short %in% ids_with_victim$id_short)
+
+victim_long <- victim_long[victim_long$indicator_value!="victim" & !is.na(victim_long$topic_value),]
+victim_net <- victim_long[,c(3,5)]
+
+edge_data <- victim_net %>%
+  group_by(indicator_value, topic_value) %>%
+  summarise(count = n(), .groups = 'drop')
+
+edge_data$indicator_value <- factor(edge_data$indicator_value)
+edge_data$topic_value <- factor(edge_data$topic_value)
+
+n <- length(levels(edge_data$indicator_value))
+m <- length(levels(edge_data$topic_value))
+adj_matrix <- matrix(0, nrow = n, ncol = m, dimnames = list(levels(edge_data$indicator_value), levels(edge_data$topic_value)))
+
+for (i in 1:nrow(edge_data)) {
+  row_index <- as.integer(edge_data$indicator_value[i])
+  col_index <- as.integer(edge_data$topic_value[i])
+  adj_matrix[row_index, col_index] <- edge_data$count[i]
+}
+
+layout <- create_layout(adj_matrix, "bipartite")
+layout$y[c(1:7)] <- 0
+layout$y[c(8:19)] <- 1
+
+ggraph(layout) +
+  geom_edge_link(
+    aes(
+      edge_width = weight, 
+      color = ifelse(weight == 1, "1", ">1"), 
+      linetype = ifelse(weight == 1, "1", ">1"),
+      edge_alpha = ifelse(weight == 1, "1", ">1")
+    ),
+    show.legend = TRUE
+  ) +
+  scale_edge_color_manual(values = c("1" = "#666666", ">1" = "#1B9E77"), guide = "none") +  # Hide color legend
+  scale_edge_linetype_manual(values = c("1" = "dashed", ">1" = "solid"), guide = "none") +  # Hide linetype legend
+  scale_edge_alpha_manual(values = c("1" = 0.3, ">1" = 0.9), guide = "none") +  # Hide alpha legend
+  guides(edge_width = guide_legend(title = "Co-Occurances")) +  # Set legend title for edge_width
+  geom_node_text(aes(label = name, y = ifelse(y == 0, -0.07, 1.07))) +
+  theme_void()
+  # +
+  # annotate("text", x = 5.75, y = -0.25, label = "Indicators", hjust = 0, vjust = 0.5, fontface = "bold", size = 5) +
+  # annotate("text", x = 5.75, y = 1.25, label = "Topics", hjust = 0, vjust = 0.5, fontface = "bold", size = 5)
+```
+
+### Table
+
+| Radicalism   | n   | Topic          | n   |
+|--------------|-----|----------------|-----|
+| activism     | 9   | western_hypo   | 52  |
+| delegitim    | 6   | media          | 30  |
+| interfaith   | 5   | scarf          | 30  |
+| dichotom     | 2   | middle_east    | 23  |
+| emancipation | 2   | crime          | 20  |
+| revisionism  | 2   | discrimination | 20  |
+| anti_dehuman | 1   | advoc          | 15  |
+| dehuman      | 1   | history        | 14  |
+| monism       | 1   | gender         | 12  |
+|              |     | moral          | 8   |
+|              |     | motivation     | 8   |
+|              |     | kinship        | 5   |
+|              |     | conversion     | 4   |
+|              |     | education      | 4   |
+|              |     | ramadan        | 3   |
+|              |     | lifestyle      | 2   |
+|              |     | shirk          | 2   |
+|              |     | lawful         | 1   |
+|              |     | rap            | 1   |
+
+: Co-Occurances of Radicalism Indicators and Topics with "Victim" {#tbl-victim}
+
+
+### Take-Aways
+
+:::
+
+## Co-Occurances: Advoc 
+
+::: {.panel-tabset}
+
+### Graph
+
+```{r bipartite-advoc}
+#| fig-width: 13.5
+ids_with_advoc <- df_final_long %>%
+  filter(topic_value == "advoc") %>%
+  distinct(id_short)
+  
+advoc_long <- df_final_long %>%
+  filter(id_short %in% ids_with_advoc$id_short)
+  
+advoc_long <- advoc_long[advoc_long$topic_value!="advoc" & !is.na(advoc_long$indicator_value),]
+
+advoc_net <- advoc_long[,c(3,5)]
+  
+edge_advoc <- advoc_net %>%
+  group_by(indicator_value, topic_value) %>%
+  summarise(count = n(), .groups = 'drop')
+
+anti_advoc_net <- edge_advoc[grepl("anti",edge_advoc$indicator_value),]
+pro_advoc_net <- edge_advoc[!grepl("anti",edge_advoc$indicator_value),]
+
+# Create adjacency matrix and layout for anti_advoc_net
+anti_advoc_net$indicator_value <- factor(anti_advoc_net$indicator_value)
+anti_advoc_net$topic_value <- factor(anti_advoc_net$topic_value)
+
+n_anti <- length(levels(anti_advoc_net$indicator_value))
+m_anti <- length(levels(anti_advoc_net$topic_value))
+adj_matrix_anti <- matrix(0, nrow = n_anti, ncol = m_anti, dimnames = list(levels(anti_advoc_net$indicator_value), levels(anti_advoc_net$topic_value)))
+
+for (i in 1:nrow(anti_advoc_net)) {
+  row_index_anti <- as.integer(anti_advoc_net$indicator_value[i])
+  col_index_anti <- as.integer(anti_advoc_net$topic_value[i])
+  adj_matrix_anti[row_index_anti, col_index_anti] <- anti_advoc_net$count[i]
+}
+
+layout_anti <- create_layout(adj_matrix_anti, "bipartite")
+
+layout_anti$name[layout_anti$name=="anti_sectarianism"] <- "anti_sect."
+layout_anti$name[layout_anti$name=="anti_emancipation"] <- "anti_eman."
+
+# Create adjacency matrix and layout for pro_advoc_net
+pro_advoc_net$indicator_value <- factor(pro_advoc_net$indicator_value)
+pro_advoc_net$topic_value <- factor(pro_advoc_net$topic_value)
+
+n_pro <- length(levels(pro_advoc_net$indicator_value))
+m_pro <- length(levels(pro_advoc_net$topic_value))
+adj_matrix_pro <- matrix(0, nrow = n_pro, ncol = m_pro, dimnames = list(levels(pro_advoc_net$indicator_value), levels(pro_advoc_net$topic_value)))
+
+for (i in 1:nrow(pro_advoc_net)) {
+  row_index_pro <- as.integer(pro_advoc_net$indicator_value[i])
+  col_index_pro <- as.integer(pro_advoc_net$topic_value[i])
+  adj_matrix_pro[row_index_pro, col_index_pro] <- pro_advoc_net$count[i]
+}
+
+layout_pro <- create_layout(adj_matrix_pro, "bipartite")
+
+layout_pro$y <- ifelse(layout_pro$type==T,1,0)
+
+anti <- ggraph(layout_anti) +
+    geom_edge_link(
+        aes(
+            edge_width = weight, 
+            color = ifelse(weight == 1, "1", ">1"), 
+            linetype = ifelse(weight == 1, "1", ">1"),
+            edge_alpha = ifelse(weight == 1, "1", ">1")
+        ),
+        show.legend = T
+    ) +
+    scale_edge_color_manual(values = c("1" = "#666666", ">1" = "#1B9E77"), guide = "none") +  # Hide color legend
+    scale_edge_linetype_manual(values = c("1" = "dashed", ">1" = "solid"), guide = "none") +  # Hide linetype legend
+    scale_edge_alpha_manual(values = c("1" = 0.3, ">1" = 0.9), guide = "none") +  # Hide alpha legend
+    guides(edge_width = guide_legend(title = "Co-Occurances")) +  # Set legend title for edge_width
+    geom_node_text(aes(label = name, y = ifelse(y == 0, -0.07, 1.07))) +
+    theme_void() +
+    ylim(-0.07, 1.3)
+
+pro <- ggraph(layout_pro) +
+    geom_edge_link(
+        aes(
+            edge_width = weight, 
+            color = ifelse(weight == 1, "1", ">1"), 
+            linetype = ifelse(weight == 1, "1", ">1"),
+            edge_alpha = ifelse(weight == 1, "1", ">1")
+        ),
+        show.legend = T
+    ) +
+    scale_edge_color_manual(values = c("1" = "#666666", ">1" = "#1B9E77"), guide = "none") +  # Hide color legend
+    scale_edge_linetype_manual(values = c("1" = "dashed", ">1" = "solid"), guide = "none") +  # Hide linetype legend
+    scale_edge_alpha_manual(values = c("1" = 0.3, ">1" = 0.9), guide = "none") +  # Hide alpha legend
+    guides(edge_width = guide_legend(title = "Co-Occurances")) +  # Set legend title for edge_width
+    geom_node_text(aes(label = name, y = ifelse(y == 0, -0.07, 1.07))) +
+    theme_void() +
+    ylim(-0.3, 1.07)
+
+anti <- anti + theme(legend.position = "top")
+pro <- pro + theme(legend.position = "bottom")
+
+grid.arrange(anti, pro, ncol = 1)
+```
+
+### Table
+
+| Radicalism        | n   | Topic          | n   |
+|-------------------|-----|----------------|-----|
+| anti_vioreg       | 64  | lifestyle      | 103 |
+| victim            | 15  | motivation     | 91  |
+| anti_monism       | 9   | kinship        | 63  |
+| monism            | 9   | moral          | 43  |
+| delegitim         | 5   | afterlife      | 41  |
+| interfaith        | 5   | gender         | 30  |
+| vioreg            | 5   | education      | 28  |
+| sectarianism      | 4   | history        | 24  |
+| activism          | 3   | lawful         | 24  |
+| emancipation      | 3   | shirk          | 19  |
+| revisionism       | 3   | ramadan        | 17  |
+| anti_closure      | 2   | media          | 11  |
+| dehuman           | 2   | conversion     | 10  |
+| anti_emancipation | 2   | business       | 9   |
+| closure           | 1   | scarf          | 7   |
+| anti_dichotom     | 1   | comedy         | 6   |
+| dichotom          | 1   | rap            | 4   |
+| anti_interfaith   | 1   | rolemodels     | 4   |
+| anti_sectarianism | 1   | western_hypo   | 4   |
+|                   |     | crime          | 3   |
+|                   |     | discrimination | 2   |
+|                   |     | ijma           | 2   |
+|                   |     | middle_east    | 1   |
+
+: Co-Occurances of Radicalism Indicators and Topics with "Advoc" {#tbl-advoc}
+
+### Take-Aways
+
+:::
+
+## Gender and Activity
+
+::: {.panel-tabset}
+
+### Table
+
+| **Topic**      | **Female** | **Male** | **Avg.Likes** | **Avg.Views** | **Avg.Duration** |
+|----------------|------------|----------|---------------|---------------|------------------|
+| comedy         | 5%         | 0.4%     | 17150         | 552373        | 20               |
+| lifestyle      | 39.6%      | 8.8%     | 26303         | 385333        | 37               |
+| kinship        | 12.6%      | 8.3%     | 17466         | 216151        | 62               |
+| conversion     | 2.3%       | 1.7%     | 18351         | 175363        | 79               |
+| lawful         | 1.1%       | 7.9%     | 11072         | 146012        | 69               |
+| western_hypo   | 0.4%       | 2%       | 9673          | 127561        | 86               |
+| education      | 2.2%       | 1.6%     | 14082         | 111535        | 56               |
+| crime          | 0.4%       | 1.2%     | 8036          | 100116        | 74               |
+| shirk          | 0.9%       | 1.6%     | 9138          | 99500         | 130              |
+| advoc          | 8.1%       | 30.1%    | 12175         | 94389         | 52               |
+| gender         | 2%         | 3.4%     | 6786          | 91989         | 70               |
+| afterlife      | 0.7%       | 4.1%     | 9734          | 83113         | 69               |
+| rolemodels     | 0%         | 0.4%     | 8279          | 82867         | 78               |
+| media          | 0.5%       | 1.4%     | 7568          | 80675         | 72               |
+| motivation     | 3.4%       | 5.3%     | 10157         | 75648         | 55               |
+| moral          | 5%         | 7.9%     | 7758          | 73022         | 88               |
+| ramadan        | 2%         | 4%       | 7202          | 69800         | 63               |
+| scarf          | 9%         | 1.8%     | 5587          | 62271         | 61               |
+| middle_east    | 0%         | 1.1%     | 6003          | 56628         | 108              |
+| rap            | 0.5%       | 0.5%     | 3253          | 39615         | 46               |
+| discrimination | 0.9%       | 1.1%     | 2727          | 38586         | 155              |
+| history        | 0.9%       | 4.8%     | 3298          | 33854         | 152              |
+| ijma           | 0%         | 0.4%     | 876           | 27654         | 92               |
+| business       | 2.3%       | 0.4%     | 1979          | 21970         | 88               |
+
+### Take-Aways
+
+
+:::
+
+
+## Retrieved Accounts, Pseudonoyms, and  Activity
+
+::: {.panel-tabset}
+
+### Table
+
+| **Account**         | **Pseudonym** | **Available** | **Gender** | **Videos** | **Start**  | **End**    |
+|---------------------|---------------|---------------|------------|------------|------------|------------|
+| abumikail1          | PT1           | TRUE          | male       | 123        | 01.01.2022 | 28.12.2022 |
+| amal_tvv            | PT2           | TRUE          | female     | 72         | 02.01.2022 | 23.12.2022 |
+| bjoernslife         | PT3           | TRUE          | male       | 70         | 02.01.2022 | 29.12.2022 |
+| circassian.eagle    | PT4           | TRUE          | male       | 83         | 02.01.2022 | 27.12.2022 |
+| dawahgang           | PT5           | TRUE          | male       | 18         | 01.01.2022 | 07.06.2022 |
+| deen_akademie       | PT6           | TRUE          | male       | 73         | 17.08.2022 | 30.12.2022 |
+| deen_ul_islam1      | PT7           | TRUE          | female     | 21         | 22.12.2022 | 31.12.2022 |
+| enes.vaseelah       | PT8           | TRUE          | male       | 69         | 02.01.2022 | 31.12.2022 |
+| ezwr1               | PT9           | TRUE          | male       | 72         | 17.01.2022 | 28.12.2022 |
+| fiete_boi           | PT10          | TRUE          | male       | 10         | 03.04.2022 | 04.11.2022 |
+| generation_islam    | PT11          | FALSE         | male       | 18         | 29.04.2022 | 12.12.2022 |
+| generation_islamgi  | PT12          | TRUE          | male       | 71         | 25.01.2022 | 26.12.2022 |
+| gglaros             | PT13          | TRUE          | male       | 68         | 12.01.2022 | 25.12.2022 |
+| gil.lua99           | PT14          | FALSE         | male       | 65         | 01.01.2022 | 26.12.2022 |
+| hamzaadrianhamza    | PT15          | TRUE          | couple     | 72         | 07.05.2022 | 27.12.2022 |
+| hidayaelisa         | PT16          | TRUE          | female     | 148        | 01.01.2022 | 31.12.2022 |
+| iman.vogue          | PT17          | TRUE          | female     | 105        | 10.06.2022 | 30.12.2022 |
+| imauftragdesislam   | PT18          | TRUE          | male       | 63         | 01.01.2022 | 13.07.2022 |
+| imjuliajordan       | PT19          | FALSE         | female     | 10         | 22.01.2022 | 13.10.2022 |
+| islam_moe           | PT20          | TRUE          | male       | 21         | 02.01.2022 | 28.12.2022 |
+| islamcontent5778ii  | PT21          | TRUE          | male       | 72         | 27.08.2022 | 07.12.2022 |
+| islamcontent778     | PT22          | TRUE          | male       | 80         | 05.07.2022 | 24.12.2022 |
+| islamic.wort        | PT23          | TRUE          | male       | 66         | 01.03.2022 | 27.12.2022 |
+| islammzitate        | PT24          | FALSE         | unknown    | 25         | 08.09.2022 | 18.12.2022 |
+| islamwunder         | PT25          | TRUE          | male       | 91         | 03.01.2022 | 19.11.2022 |
+| isso_bayan          | PT26          | TRUE          | male       | 156        | 04.01.2022 | 31.12.2022 |
+| logical114          | PT27          | TRUE          | male       | 26         | 30.01.2022 | 27.12.2022 |
+| loransyusuf         | PT28          | TRUE          | male       | 81         | 22.01.2022 | 26.12.2022 |
+| loveallah.de        | PT29          | TRUE          | male       | 156        | 01.01.2022 | 29.12.2022 |
+| machtsklick_support | PT30          | TRUE          | male       | 93         | 10.01.2022 | 19.12.2022 |
+| mazooffiziell1      | PT31          | FALSE         | male       | 18         | 02.01.2022 | 26.12.2022 |
+| mert.islam.27       | PT32          | TRUE          | male       | 14         | 28.07.2022 | 13.08.2022 |
+| mira_eliane         | PT33          | TRUE          | female     | 50         | 06.01.2022 | 28.12.2022 |
+| moe786hh            | PT34          | TRUE          | male       | 155        | 10.01.2022 | 27.12.2022 |
+| mucahit_akif_uzun   | PT35          | TRUE          | male       | 47         | 06.01.2022 | 21.12.2022 |
+| musliminteraktiv    | PT36          | FALSE         | male       | 118        | 05.01.2022 | 30.12.2022 |
+| nalhi.23            | PT37          | TRUE          | male       | 64         | 01.01.2022 | 23.12.2022 |
+| redlionx            | PT38          | TRUE          | male       | 24         | 06.01.2022 | 22.11.2022 |
+| safi_muslimcouple   | PT39          | TRUE          | couple     | 59         | 01.01.2022 | 09.12.2022 |
+| sakinaannur         | PT40          | TRUE          | unknown    | 76         | 01.01.2022 | 26.12.2022 |
+| sarikliyunus        | PT41          | FALSE         | male       | 50         | 04.01.2022 | 30.12.2022 |
+| teamsad.1           | PT42          | FALSE         | male       | 156        | 02.01.2022 | 30.12.2022 |
+| youngmuslimofficial | PT43          | TRUE          | male       | 54         | 11.01.2022 | 30.12.2022 |
+
+### Activity Graph
+
+```{r act_overall}
+#| fig-width: 7
+
+df <- df %>%
+  mutate(year_month = floor_date(date, "month"))
+
+df_monthly <- df %>%
+  group_by(year_month) %>%
+  summarise(videos = n(),
+            unique_accounts = n_distinct(user.y))
+
+df_monthly <- df_monthly[c(1:12),]
+
+ggplot(df_monthly, aes(x = year_month, y = videos, fill = unique_accounts)) +
+  geom_col(alpha = 0.5) + 
+  geom_line() +
+  scale_fill_viridis_c() +
+  theme_minimal() +
+  labs(x = "Year-Month",
+       y = "Number of Videos",
+       fill = "Unique Accounts")
+```
+
+### By Account
+
+```{r act_account}
+#| fig-width: 13.5
+#| fig-height: 9
+
+df_acc_counts <- df %>%
+  filter(!is.na(year_month)) %>%
+  group_by(Pseudonym, year_month) %>%
+  summarise(count = n())
+
+
+df_acc_counts <- df_acc_counts %>%
+  mutate(Pseudonym = factor(Pseudonym, levels = paste0("PT", 1:43)))
+
+ggplot(df_acc_counts, aes(x = year_month, y = count)) +
+  geom_col() +
+  facet_wrap(~ Pseudonym) +
+  theme_minimal() +
+  theme(legend.position = "none",
+axis.text.x = element_text(angle = 30, hjust = 1)) +
+  labs(x = "Year-Month",
+       y = "Videos")
+```
+
+
+
+:::
