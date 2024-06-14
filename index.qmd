@@ -13,7 +13,7 @@ execute:
 
 ```{r packages}
 pacman::p_load(tidyverse, readxl, igraph, ggraph, RColorBrewer, corrplot,
-               gridExtra, lubridate, ggridges)
+               gridExtra, lubridate, ggridges, grid)
 options(knitr.kable.NA = "")
 ```
 
@@ -68,6 +68,54 @@ df <- df %>%
     user.y == "sarikliyunus" ~ "PT41",
     user.y == "teamsad.1" ~ "PT42",
     user.y == "youngmuslimofficial" ~ "PT43",
+    TRUE ~ NA_character_
+  ))
+
+df <- df %>%
+  mutate(Status = case_when(
+    user.y == "abumikail1" ~ "Identified",
+    user.y == "amal_tvv" ~ "Not Identified",
+    user.y == "bjoernslife" ~ "Not Identified",
+    user.y == "circassian.eagle" ~ "Not Identified",
+    user.y == "dawahgang" ~ "Not Identified",
+    user.y == "deen_akademie" ~ "Identified",
+    user.y == "deen_ul_islam1" ~ "Not Identified",
+    user.y == "enes.vaseelah" ~ "Not Identified",
+    user.y == "ezwr1" ~ "Identified",
+    user.y == "fiete_boi" ~ "Not Identified",
+    user.y == "generation_islam" ~ "Identified",
+    user.y == "generation_islamgi" ~ "Identified",
+    user.y == "gglaros" ~ "Not Identified",
+    user.y == "gil.lua99" ~ "Not Identified",
+    user.y == "hamzaadrianhamza" ~ "Not Identified",
+    user.y == "hidayaelisa" ~ "Not Identified",
+    user.y == "iman.vogue" ~ "Not Identified",
+    user.y == "imauftragdesislam" ~ "Identified",
+    user.y == "imjuliajordan" ~ "Not Identified",
+    user.y == "islam_moe" ~ "Not Identified",
+    user.y == "islamcontent5778ii" ~ "Identified",
+    user.y == "islamcontent778" ~ "Not Identified",
+    user.y == "islamic.wort" ~ "Not Identified",
+    user.y == "islammzitate" ~ "Not Identified",
+    user.y == "islamwunder" ~ "Not Identified",
+    user.y == "isso_bayan" ~ "Not Identified",
+    user.y == "logical114" ~ "Not Identified",
+    user.y == "loransyusuf" ~ "Identified",
+    user.y == "loveallah.de" ~ "Identified",
+    user.y == "machtsklick_support" ~ "Identified",
+    user.y == "mazooffiziell1" ~ "Not Identified",
+    user.y == "mert.islam.27" ~ "Not Identified",
+    user.y == "mira_eliane" ~ "Not Identified",
+    user.y == "moe786hh" ~ "Not Identified",
+    user.y == "mucahit_akif_uzun" ~ "Not Identified",
+    user.y == "musliminteraktiv" ~ "Identified",
+    user.y == "nalhi.23" ~ "Not Identified",
+    user.y == "redlionx" ~ "Not Identified",
+    user.y == "safi_muslimcouple" ~ "Not Identified",
+    user.y == "sakinaannur" ~ "Not Identified",
+    user.y == "sarikliyunus" ~ "Not Identified",
+    user.y == "teamsad.1" ~ "Not Identified",
+    user.y == "youngmuslimofficial" ~ "Identified",
     TRUE ~ NA_character_
   ))
 ```
@@ -537,6 +585,61 @@ See Paper
 
 :::
 
+## Status and Topical Diversity
+
+```{r status}
+#| fig-width: 7
+#| fig-height: 8
+status_sum <- df_long_indicators %>%
+  group_by(Status, indicator_value) %>%
+  summarise(sum = length(indicator_value)) %>%
+  ungroup()
+
+status_sum <- status_sum %>%
+  left_join(status_sum %>%
+    group_by(Status) %>%
+    summarize(total = sum(sum, na.rm = TRUE)), by = "Status")
+
+status_sum$pcnt <- status_sum$sum/status_sum$total*100
+status_sum <- status_sum %>%
+  group_by(Status) %>%
+  mutate(ymax = cumsum(pcnt))
+
+indicators_plot <- ggplot(status_sum, aes(x = indicator_value, y = pcnt)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  facet_wrap(~ Status) +
+   scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  labs(y = "Percent", x = "Indicator")
+
+topic_status <- df_long_topics %>%
+  group_by(Status, topic_value) %>% 
+  summarise(sum = length(topic_value)) %>%
+  ungroup()
+
+topic_status <- topic_status %>%
+  left_join(topic_status %>%
+    group_by(Status) %>%
+    summarize(total = sum(sum)), by = "Status")
+
+topic_status$pcnt <- topic_status$sum/topic_status$total*100
+
+topics_plot <- topic_status %>%
+  group_by(Status) %>%
+  slice_max(sum, n = 10) %>%
+  ungroup() %>%
+  ggplot(.,aes(x = reorder(topic_value, pcnt), y = pcnt)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  facet_wrap(~ Status, scales = "free_y") +
+   scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  labs(y = "Percent", x = "Top 10 Topics")
+
+grid.arrange(indicators_plot, topics_plot, ncol = 1)
+```
+
 
 ## Retrieved Accounts, Pseudonoyms, and  Activity
 
@@ -544,51 +647,52 @@ See Paper
 
 ### Table
 
-| **Account**         | **Pseudonym** | **Available** | **Gender** | **Videos** | **Start**  | **End**    |
-|---------------------|---------------|---------------|------------|------------|------------|------------|
-| abumikail1          | PT1           | TRUE          | male       | 123        | 01.01.2022 | 28.12.2022 |
-| amal_tvv            | PT2           | TRUE          | female     | 72         | 02.01.2022 | 23.12.2022 |
-| bjoernslife         | PT3           | TRUE          | male       | 70         | 02.01.2022 | 29.12.2022 |
-| circassian.eagle    | PT4           | TRUE          | male       | 83         | 02.01.2022 | 27.12.2022 |
-| dawahgang           | PT5           | TRUE          | male       | 18         | 01.01.2022 | 07.06.2022 |
-| deen_akademie       | PT6           | TRUE          | male       | 73         | 17.08.2022 | 30.12.2022 |
-| deen_ul_islam1      | PT7           | TRUE          | female     | 21         | 22.12.2022 | 31.12.2022 |
-| enes.vaseelah       | PT8           | TRUE          | male       | 69         | 02.01.2022 | 31.12.2022 |
-| ezwr1               | PT9           | TRUE          | male       | 72         | 17.01.2022 | 28.12.2022 |
-| fiete_boi           | PT10          | TRUE          | male       | 10         | 03.04.2022 | 04.11.2022 |
-| generation_islam    | PT11          | FALSE         | male       | 18         | 29.04.2022 | 12.12.2022 |
-| generation_islamgi  | PT12          | TRUE          | male       | 71         | 25.01.2022 | 26.12.2022 |
-| gglaros             | PT13          | TRUE          | male       | 68         | 12.01.2022 | 25.12.2022 |
-| gil.lua99           | PT14          | FALSE         | male       | 65         | 01.01.2022 | 26.12.2022 |
-| hamzaadrianhamza    | PT15          | TRUE          | couple     | 72         | 07.05.2022 | 27.12.2022 |
-| hidayaelisa         | PT16          | TRUE          | female     | 148        | 01.01.2022 | 31.12.2022 |
-| iman.vogue          | PT17          | TRUE          | female     | 105        | 10.06.2022 | 30.12.2022 |
-| imauftragdesislam   | PT18          | TRUE          | male       | 63         | 01.01.2022 | 13.07.2022 |
-| imjuliajordan       | PT19          | FALSE         | female     | 10         | 22.01.2022 | 13.10.2022 |
-| islam_moe           | PT20          | TRUE          | male       | 21         | 02.01.2022 | 28.12.2022 |
-| islamcontent5778ii  | PT21          | TRUE          | male       | 72         | 27.08.2022 | 07.12.2022 |
-| islamcontent778     | PT22          | TRUE          | male       | 80         | 05.07.2022 | 24.12.2022 |
-| islamic.wort        | PT23          | TRUE          | male       | 66         | 01.03.2022 | 27.12.2022 |
-| islammzitate        | PT24          | FALSE         | unknown    | 25         | 08.09.2022 | 18.12.2022 |
-| islamwunder         | PT25          | TRUE          | male       | 91         | 03.01.2022 | 19.11.2022 |
-| isso_bayan          | PT26          | TRUE          | male       | 156        | 04.01.2022 | 31.12.2022 |
-| logical114          | PT27          | TRUE          | male       | 26         | 30.01.2022 | 27.12.2022 |
-| loransyusuf         | PT28          | TRUE          | male       | 81         | 22.01.2022 | 26.12.2022 |
-| loveallah.de        | PT29          | TRUE          | male       | 156        | 01.01.2022 | 29.12.2022 |
-| machtsklick_support | PT30          | TRUE          | male       | 93         | 10.01.2022 | 19.12.2022 |
-| mazooffiziell1      | PT31          | FALSE         | male       | 18         | 02.01.2022 | 26.12.2022 |
-| mert.islam.27       | PT32          | TRUE          | male       | 14         | 28.07.2022 | 13.08.2022 |
-| mira_eliane         | PT33          | TRUE          | female     | 50         | 06.01.2022 | 28.12.2022 |
-| moe786hh            | PT34          | TRUE          | male       | 155        | 10.01.2022 | 27.12.2022 |
-| mucahit_akif_uzun   | PT35          | TRUE          | male       | 47         | 06.01.2022 | 21.12.2022 |
-| musliminteraktiv    | PT36          | FALSE         | male       | 118        | 05.01.2022 | 30.12.2022 |
-| nalhi.23            | PT37          | TRUE          | male       | 64         | 01.01.2022 | 23.12.2022 |
-| redlionx            | PT38          | TRUE          | male       | 24         | 06.01.2022 | 22.11.2022 |
-| safi_muslimcouple   | PT39          | TRUE          | couple     | 59         | 01.01.2022 | 09.12.2022 |
-| sakinaannur         | PT40          | TRUE          | unknown    | 76         | 01.01.2022 | 26.12.2022 |
-| sarikliyunus        | PT41          | FALSE         | male       | 50         | 04.01.2022 | 30.12.2022 |
-| teamsad.1           | PT42          | FALSE         | male       | 156        | 02.01.2022 | 30.12.2022 |
-| youngmuslimofficial | PT43          | TRUE          | male       | 54         | 11.01.2022 | 30.12.2022 |
+| **Account**         | **Pseudonym** | **Status***    | **Available** | **Gender** | **Videos** | **Start**  | **End**    |
+|---------------------|---------------|----------------|---------------|------------|------------|------------|------------|
+| abumikail1          | PT1           | Identified     | TRUE          | male       | 123        | 01.01.2022 | 28.12.2022 |
+| amal_tvv            | PT2           | Not Identified | TRUE          | female     | 72         | 02.01.2022 | 23.12.2022 |
+| bjoernslife         | PT3           | Not Identified | TRUE          | male       | 70         | 02.01.2022 | 29.12.2022 |
+| circassian.eagle    | PT4           | Not Identified | TRUE          | male       | 83         | 02.01.2022 | 27.12.2022 |
+| dawahgang           | PT5           | Not Identified | TRUE          | male       | 18         | 01.01.2022 | 07.06.2022 |
+| deen_akademie       | PT6           | Identified     | TRUE          | male       | 73         | 17.08.2022 | 30.12.2022 |
+| deen_ul_islam1      | PT7           | Not Identified | TRUE          | female     | 21         | 22.12.2022 | 31.12.2022 |
+| enes.vaseelah       | PT8           | Not Identified | TRUE          | male       | 69         | 02.01.2022 | 31.12.2022 |
+| ezwr1               | PT9           | Identified     | TRUE          | male       | 72         | 17.01.2022 | 28.12.2022 |
+| fiete_boi           | PT10          | Not Identified | TRUE          | male       | 10         | 03.04.2022 | 04.11.2022 |
+| generation_islam    | PT11          | Identified     | FALSE         | male       | 18         | 29.04.2022 | 12.12.2022 |
+| generation_islamgi  | PT12          | Identified     | TRUE          | male       | 71         | 25.01.2022 | 26.12.2022 |
+| gglaros             | PT13          | Not Identified | TRUE          | male       | 68         | 12.01.2022 | 25.12.2022 |
+| gil.lua99           | PT14          | Not Identified | FALSE         | male       | 65         | 01.01.2022 | 26.12.2022 |
+| hamzaadrianhamza    | PT15          | Not Identified | TRUE          | couple     | 72         | 07.05.2022 | 27.12.2022 |
+| hidayaelisa         | PT16          | Not Identified | TRUE          | female     | 148        | 01.01.2022 | 31.12.2022 |
+| iman.vogue          | PT17          | Not Identified | TRUE          | female     | 105        | 10.06.2022 | 30.12.2022 |
+| imauftragdesislam   | PT18          | Identified     | TRUE          | male       | 63         | 01.01.2022 | 13.07.2022 |
+| imjuliajordan       | PT19          | Not Identified | FALSE         | female     | 10         | 22.01.2022 | 13.10.2022 |
+| islam_moe           | PT20          | Not Identified | TRUE          | male       | 21         | 02.01.2022 | 28.12.2022 |
+| islamcontent5778ii  | PT21          | Identified     | TRUE          | male       | 72         | 27.08.2022 | 07.12.2022 |
+| islamcontent778     | PT22          | Not Identified | TRUE          | male       | 80         | 05.07.2022 | 24.12.2022 |
+| islamic.wort        | PT23          | Not Identified | TRUE          | male       | 66         | 01.03.2022 | 27.12.2022 |
+| islammzitate        | PT24          | Not Identified | FALSE         | unknown    | 25         | 08.09.2022 | 18.12.2022 |
+| islamwunder         | PT25          | Not Identified | TRUE          | male       | 91         | 03.01.2022 | 19.11.2022 |
+| isso_bayan          | PT26          | Not Identified | TRUE          | male       | 156        | 04.01.2022 | 31.12.2022 |
+| logical114          | PT27          | Not Identified | TRUE          | male       | 26         | 30.01.2022 | 27.12.2022 |
+| loransyusuf         | PT28          | Identified     | TRUE          | male       | 81         | 22.01.2022 | 26.12.2022 |
+| loveallah.de        | PT29          | Identified     | TRUE          | male       | 156        | 01.01.2022 | 29.12.2022 |
+| machtsklick_support | PT30          | Identified     | TRUE          | male       | 93         | 10.01.2022 | 19.12.2022 |
+| mazooffiziell1      | PT31          | Not Identified | FALSE         | male       | 18         | 02.01.2022 | 26.12.2022 |
+| mert.islam.27       | PT32          | Not Identified | TRUE          | male       | 14         | 28.07.2022 | 13.08.2022 |
+| mira_eliane         | PT33          | Not Identified | TRUE          | female     | 50         | 06.01.2022 | 28.12.2022 |
+| moe786hh            | PT34          | Identified     | TRUE          | male       | 155        | 10.01.2022 | 27.12.2022 |
+| mucahit_akif_uzun   | PT35          | Not Identified | TRUE          | male       | 47         | 06.01.2022 | 21.12.2022 |
+| musliminteraktiv    | PT36          | Not Identified | FALSE         | male       | 118        | 05.01.2022 | 30.12.2022 |
+| nalhi.23            | PT37          | Not Identified | TRUE          | male       | 64         | 01.01.2022 | 23.12.2022 |
+| redlionx            | PT38          | Identified     | TRUE          | male       | 24         | 06.01.2022 | 22.11.2022 |
+| safi_muslimcouple   | PT39          | Not Identified | TRUE          | couple     | 59         | 01.01.2022 | 09.12.2022 |
+| sakinaannur         | PT40          | Not Identified | TRUE          | unknown    | 76         | 01.01.2022 | 26.12.2022 |
+| sarikliyunus        | PT41          | Not Identified | FALSE         | male       | 50         | 04.01.2022 | 30.12.2022 |
+| teamsad.1           | PT42          | Not Identified | FALSE         | male       | 156        | 02.01.2022 | 30.12.2022 |
+| youngmuslimofficial | PT43          | Identified     | TRUE          | male       | 54         | 11.01.2022 | 30.12.2022 |
+|                     |               |                |               |            |            |            |            |
 
 ### Activity Graph
 
